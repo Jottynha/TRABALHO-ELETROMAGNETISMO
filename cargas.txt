@@ -1,0 +1,2 @@
+pos: 1,2 charge: 1.0
+pos: 2,4 charge: -1.2

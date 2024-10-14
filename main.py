@@ -1,7 +1,9 @@
 import pygame
 import math
 import tkinter as tk
+from tkinter import scrolledtext
 from tkinter import simpledialog, messagebox
+import threading
 
 pygame.init()
 
@@ -34,21 +36,73 @@ button_color = (0, 128, 255)
 button_text = font.render("Informações", True, BLACK)
 #INTERFACES
 def show_info_window():
-    root = tk.Tk()
-    root.title("Informações do Programa")
-    message = (
-        "Simulador da Lei de Coulomb\n\n"
-        "Este programa simula a interação entre cargas elétricas segundo a Lei de Coulomb.\n"
-        "Você pode adicionar, editar e visualizar as forças atuantes entre as cargas.\n\n"
-        "Comandos:\n"
-        "Pressione 'A' para adicionar uma carga\n"
-        "Pressione 'C' para editar uma carga\n"
-        "Clique em uma carga para ver as forças\n"
-        "Pressione 'R' para reiniciar a simulação."
-    )
-    label = tk.Label(root, text=message, padx=10, pady=10)
-    label.pack()
-    root.mainloop()
+    def open_window():
+        root = tk.Tk()
+        root.title("Informações do Programa")
+
+        message = (
+            "Simulador da Lei de Coulomb\n\n"
+            "Este programa simula a interação entre cargas elétricas segundo a Lei de Coulomb.\n"
+            "Você pode adicionar, editar e visualizar as forças atuantes entre as cargas.\n\n"
+            "Comandos:\n"
+            "Pressione 'A' para adicionar uma carga\n"
+            "Pressione 'C' para editar uma carga\n"
+            "Pressione 'D' para deletar uma carga.\n"
+            "Clique em uma carga para ver as forças\n"
+            "Pressione 'R' para reiniciar a simulação.\n"
+        )
+        
+        label = tk.Label(root, text=message, padx=10, pady=10)
+        label.pack()
+
+        # Botão para importar cargas
+        import_button = tk.Button(root, text="Importar Cargas", command=lambda: importar_cargas('cargas.txt'))
+        import_button.pack(pady=10)  # Adiciona o botão com espaçamento vertical
+        
+        def visualizar_arquivo():
+            try:
+                with open('cargas.txt', 'r') as file:
+                    conteudo = file.read()
+
+                # Criar nova janela para exibir o conteúdo do arquivo
+                file_window = tk.Toplevel(root)
+                file_window.title("Visualizar Arquivo cargas.txt")
+                file_text = scrolledtext.ScrolledText(file_window, wrap=tk.WORD, width=40, height=10, padx=10, pady=10)
+                file_text.insert(tk.END, conteudo)
+                file_text.config(state=tk.DISABLED)
+                file_text.pack()
+            except FileNotFoundError:
+                error_label = tk.Label(root, text="Arquivo cargas.txt não encontrado!", fg="red")
+                error_label.pack()
+        def visualizar_cargas():
+            if not charges:
+                error_label = tk.Label(root, text="Nenhuma carga presente no sistema!", fg="red")
+                error_label.pack()
+            else:
+                charges_window = tk.Toplevel(root)
+                charges_window.title("Cargas Presentes no Sistema")
+                charges_text = scrolledtext.ScrolledText(charges_window, wrap=tk.WORD, width=40, height=10, padx=10, pady=10)
+                
+                # Montando o texto com as cargas
+                for idx, charge in enumerate(charges):
+                    pos = charge['pos']
+                    charge_value = charge['charge']
+                    charge_info = f"Carga {idx+1}: Posição = {pos}, Valor da Carga = {charge_value}\n"
+                    charges_text.insert(tk.END, charge_info)
+
+                charges_text.config(state=tk.DISABLED)
+                charges_text.pack()        
+
+        visualizar_btn = tk.Button(root, text="Visualizar cargas.txt", command=visualizar_arquivo)
+        visualizar_btn.pack(pady=10)
+
+        visualizar_cargas_btn = tk.Button(root, text="Visualizar Cargas no Sistema", command=visualizar_cargas)
+        visualizar_cargas_btn.pack(pady=11)
+
+        root.mainloop()
+
+    # Abrir janela de Tkinter em uma nova thread
+    threading.Thread(target=open_window).start()
 
 
 
@@ -168,7 +222,7 @@ def show_forces(q):
     forces = []
     total_force_x = 0
     total_force_y = 0
-
+    forces.append(f"Carga {q['number']} com valor de {q['charge']} C.")
     for other_charge in charges:
         if other_charge != q:
             force = calculate_force(q, other_charge)
@@ -194,10 +248,32 @@ def show_forces(q):
     else:
         forces.append("Sem Forças Atuantes")
 
-    # Exibe as forças em uma janela
     messagebox.showinfo("Forças Atuantes", "\n".join(forces))
     root.destroy()
 
+def importar_cargas(arquivo):
+    global charges
+    try:
+        with open(arquivo, 'r') as file:
+            charges.clear()  # Limpa as cargas atuais
+            for idx, line in enumerate(file):
+                parts = line.split()  # Divide a linha em partes
+                pos_part = parts[1].split(',')
+                pos_x, pos_y = int(pos_part[0]), int(pos_part[1])
+                
+                charge_value = float(parts[3])
+                
+                charge = {
+                    'pos': (pos_x, pos_y),
+                    'charge': charge_value,
+                    'number': idx + 1  # Adiciona um número sequencial à carga
+                }
+                charges.append(charge)
+        print("Cargas importadas com sucesso!")
+    except FileNotFoundError:
+        print(f"Arquivo {arquivo} não encontrado.")
+    except Exception as e:
+        print(f"Erro ao ler o arquivo: {e}")
 
 
 def add_charge_interface():
@@ -232,10 +308,8 @@ def handle_click(pos):
 # Loop principal
 running = True
 clock = pygame.time.Clock()
-# Variável para controlar a tela inicial
 show_intro = True
 
-# Função para desenhar a tela inicial
 def draw_intro():
     screen.fill(WHITE)
     screen.blit(background_image, (0, 0))
@@ -244,14 +318,30 @@ def draw_intro():
     commands_text = bold_font.render("Comandos:", True, BLACK)
     command1_text = font.render("Pressione 'A' para adicionar uma carga", True, BLACK)
     command2_text = font.render("Pressione 'C' para editar uma carga", True, BLACK)
-    command3_text = font.render("Clique em uma carga para ver as forças", True, BLACK)
+    command3_text = font.render("Pressione 'D' para deletar uma carga", True, BLACK)
+    command4_text = font.render("Pressione 'R' para reiniciar a simulação", True, BLACK)
+    command5_text = font.render("Pressione 'Q' para reiniciar o programa", True, BLACK)
+    command6_text = font.render("Clique em uma carga para ver as forças", True, BLACK)
 
     screen.blit(title_text, (width // 2 - title_text.get_width() // 2, height // 4))
     screen.blit(instructions_text, (width // 2 - instructions_text.get_width() // 2, height // 2))
     screen.blit(commands_text, (width // 2 - commands_text.get_width() // 2, height // 2 + 30))
     screen.blit(command1_text, (width // 2 - command1_text.get_width() // 2, height // 2 + 60))
     screen.blit(command2_text, (width // 2 - command2_text.get_width() // 2, height // 2 + 90))
-    screen.blit(command3_text, (width // 2 - command2_text.get_width() // 2, height // 2 + 120))
+    screen.blit(command3_text, (width // 2 - command3_text.get_width() // 2, height // 2 + 120))
+    screen.blit(command4_text, (width // 2 - command4_text.get_width() // 2, height // 2 + 150))
+    screen.blit(command5_text, (width // 2 - command5_text.get_width() // 2, height // 2 + 180))
+    screen.blit(command6_text, (width // 2 - command6_text.get_width() // 2, height // 2 + 210))
+
+def delete_charge():
+    charge_number = simpledialog.askinteger("Deletar Carga", "Insira o número da carga:")
+    if charge_number is not None:
+        if 1 <= charge_number <= len(charges):
+            charge = charges[charge_number - 1]
+            charges.remove(charge)  # Remove da lista
+            messagebox.showinfo("Sucesso", f"Carga {charge_number} deletada com sucesso.")
+        else:
+            messagebox.showerror("Erro", "Número da carga inválido.")
 
 def edit_charge_interface():
     charge_number = simpledialog.askinteger("Editar Carga", "Insira o número da carga:")
@@ -273,7 +363,7 @@ def edit_charge_interface():
                             distance = math.sqrt((existing_charge['pos'][0] - x)**2 + (existing_charge['pos'][1] - y)**2)
                             if distance < 2:  # A distância mínima deve ser maior que o raio (20 pixels, então 2 é o limite)
                                 messagebox.showerror("Erro", "A nova posição colide com uma carga existente. Tente outra posição.")
-                                return  # Retorna sem atualizar a carga
+                                return  
 
                     charge['pos'] = [x, y]  # Atualiza a posição
                 except ValueError:
@@ -281,18 +371,25 @@ def edit_charge_interface():
         else:
             messagebox.showerror("Erro", "Número da carga inválido.")
 
+def reset_simulation():
+    global show_intro, simulation_running, charges
+    show_intro = True
+    simulation_running = False
+    charges.clear()
+
+
 
 while running:
     if show_intro:
-        draw_intro()  # Chama a nova função para desenhar a tela inicial
+        draw_intro()
     elif not simulation_running:
         screen.fill(LIGHT_GRAY)
-        screen.blit(background_image, (0, 0))  
+        screen.blit(background_image, (0, 0))
         title_text = font.render("Lei de Coulomb", True, BLACK)
         screen.blit(law_image, image_rect.topleft)
-        outline_rect = image_rect.inflate(10, 10) 
+        outline_rect = image_rect.inflate(10, 10)
         pygame.draw.rect(screen, BLACK, outline_rect, 2)
-        screen.blit(title_text, (width // 2 - title_text.get_width() // 2, height - 550))        
+        screen.blit(title_text, (width // 2 - title_text.get_width() // 2, height - 550))
         pygame.display.update()
     else:
         screen.fill(DARK_GRAY)
@@ -303,7 +400,6 @@ while running:
         outline_rect = button_rect.inflate(5, 5)
         pygame.draw.rect(screen, BLACK, outline_rect, 2)
         screen.blit(button_text, (button_rect.x + 10, button_rect.y + 5))  # Centraliza o texto no botão
-        
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -318,13 +414,18 @@ while running:
             elif event.key == pygame.K_a and simulation_running:
                 add_charge_interface()
             elif event.key == pygame.K_c and simulation_running:
-                edit_charge_interface()  
-            elif event.key == pygame.K_r:  
+                edit_charge_interface()
+            elif event.key == pygame.K_r:
                 charges.clear()
-        elif event.type == pygame.MOUSEBUTTONDOWN and simulation_running:
-            handle_click(pygame.mouse.get_pos())
+            elif event.key == pygame.K_d:
+                delete_charge()
+            elif event.key == pygame.K_q:
+                reset_simulation()
+        elif event.type == pygame.MOUSEBUTTONDOWN:
             mouse_pos = pygame.mouse.get_pos()
-            if button_rect.collidepoint(mouse_pos):  # Verifica se o botão foi clicado
+            if simulation_running:
+                handle_click(mouse_pos)
+            if button_rect.collidepoint(mouse_pos):  # Verifica se o botão de reinício foi clicado
                 show_info_window()
 
     pygame.display.update()
