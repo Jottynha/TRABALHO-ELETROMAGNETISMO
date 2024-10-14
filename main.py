@@ -69,55 +69,63 @@ def draw_charges():
         
         # Desenha a carga (círculo)
         pygame.draw.circle(screen, color, (pos_x, pos_y), 20)
+        pygame.draw.circle(screen, BLACK, (pos_x, pos_y), 20, 2)  # Contorno
+
         
         # Desenha o número da carga dentro do círculo
         charge_number_text = font.render(str(charge['number']), True, WHITE)
         screen.blit(charge_number_text, (pos_x - charge_number_text.get_width() // 2, pos_y - charge_number_text.get_height() // 2))
 
 
-def draw_force_vector(q1, q2):
-    pos_x1 = int(q1['pos'][0] * SCALE + width // 2)
-    pos_y1 = int(height // 2 - q1['pos'][1] * SCALE)
-    pos_x2 = int(q2['pos'][0] * SCALE + width // 2)
-    pos_y2 = int(height // 2 - q2['pos'][1] * SCALE)
+def draw_force_vectors():
+    for i in range(len(charges)):
+        total_force_x = 0
+        total_force_y = 0
+        
+        for j in range(len(charges)):
+            if i != j:
+                force = calculate_force(charges[i], charges[j])
+                total_force_x += force[0]
+                total_force_y += force[1]
 
-    # Calcula a força entre as duas cargas
-    force = calculate_force(q1, q2)
+        # Calcula a magnitude total da força
+        total_force_magnitude = math.sqrt(total_force_x**2 + total_force_y**2)
+        
+        pos_x1 = int(charges[i]['pos'][0] * SCALE + width // 2)
+        pos_y1 = int(height // 2 - charges[i]['pos'][1] * SCALE)
 
-    # Desenha o vetor de força partindo de q1 em direção à força calculada
-    force_magnitude = math.sqrt(force[0]**2 + force[1]**2)
+        # Normaliza o vetor para que tenha um comprimento máximo proporcional ao total da força
+        if total_force_magnitude > 0:
+            unit_fx = total_force_x / total_force_magnitude
+            unit_fy = total_force_y / total_force_magnitude
+            # Aumenta o comprimento do vetor proporcionalmente à força total
+            scaled_length = min(total_force_magnitude * 0.0001, VECTOR_LENGTH)
+        else:
+            continue 
 
-    # Normaliza o vetor para que tenha um comprimento máximo de VECTOR_LENGTH
-    unit_fx = force[0] / force_magnitude
-    unit_fy = force[1] / force_magnitude
+        # Calcula o ponto final da seta baseado na direção da força
+        end_x = pos_x1 + unit_fx * scaled_length
+        end_y = pos_y1 - unit_fy * scaled_length
+        
+        pygame.draw.line(screen, GREEN, (pos_x1, pos_y1), (end_x, end_y), 2)
 
-    # Ajusta o tamanho do vetor para ser proporcional, mas limitado
-    scaled_length = min(force_magnitude * 0.0001, VECTOR_LENGTH)
+        # Desenhar a seta na extremidade do vetor
+        arrow_length = 10
+        arrow_angle = math.pi / 6  # Ângulo da seta
+        angle = math.atan2(-unit_fy, unit_fx)  # Ângulo baseado na direção do vetor de força
 
-    # Calcula o ponto final da seta baseado na direção da força
-    end_x = pos_x1 + unit_fx * scaled_length
-    end_y = pos_y1 - unit_fy * scaled_length
+        # Posição dos dois pontos que formam a seta
+        arrow_point1 = (
+            end_x - arrow_length * math.cos(angle + arrow_angle),
+            end_y - arrow_length * math.sin(angle + arrow_angle)
+        )
+        arrow_point2 = (
+            end_x - arrow_length * math.cos(angle - arrow_angle),
+            end_y - arrow_length * math.sin(angle - arrow_angle)
+        )
 
-    # Desenhar a linha do vetor
-    pygame.draw.line(screen, GREEN, (pos_x1, pos_y1), (end_x, end_y), 2)
-
-    # Desenhar a seta na extremidade do vetor
-    arrow_length = 10
-    arrow_angle = math.pi / 6  # Ângulo da seta
-    angle = math.atan2(-unit_fy, unit_fx)  # Ângulo baseado na direção do vetor de força
-
-    # Posição dos dois pontos que formam a seta
-    arrow_point1 = (
-        end_x - arrow_length * math.cos(angle + arrow_angle),
-        end_y - arrow_length * math.sin(angle + arrow_angle)
-    )
-    arrow_point2 = (
-        end_x - arrow_length * math.cos(angle - arrow_angle),
-        end_y - arrow_length * math.sin(angle - arrow_angle)
-    )
-
-    # Desenha a seta
-    pygame.draw.polygon(screen, GREEN, [arrow_point1, arrow_point2, (end_x, end_y)])
+        # Desenha a seta
+        pygame.draw.polygon(screen, GREEN, [arrow_point1, arrow_point2, (end_x, end_y)])
 
 
 def show_forces(q):
@@ -167,37 +175,96 @@ def handle_click(pos):
 # Loop principal
 running = True
 clock = pygame.time.Clock()
+# Variável para controlar a tela inicial
+show_intro = True
 
+# Função para desenhar a tela inicial
+def draw_intro():
+    screen.fill(WHITE)
+    title_text = font.render("Simulador da Lei de Coulomb", True, BLACK)
+    instructions_text = font.render("Pressione 'Enter' para Iniciar", True, BLACK)
+    commands_text = font.render("Comandos:", True, BLACK)
+    command1_text = font.render("Pressione 'A' para adicionar uma carga", True, BLACK)
+    command2_text = font.render("Clique em uma carga para ver as forças", True, BLACK)
+
+    screen.blit(title_text, (width // 2 - title_text.get_width() // 2, height // 4))
+    screen.blit(instructions_text, (width // 2 - instructions_text.get_width() // 2, height // 2))
+    screen.blit(commands_text, (width // 2 - commands_text.get_width() // 2, height // 2 + 30))
+    screen.blit(command1_text, (width // 2 - command1_text.get_width() // 2, height // 2 + 60))
+    screen.blit(command2_text, (width // 2 - command2_text.get_width() // 2, height // 2 + 90))
+
+def edit_charge_interface():
+    charge_number = simpledialog.askinteger("Editar Carga", "Insira o número da carga:")
+    if charge_number is not None:
+        if 1 <= charge_number <= len(charges):
+            charge = charges[charge_number - 1]  # Obtém a carga correspondente ao número
+
+            new_charge = simpledialog.askfloat("Editar Carga", "Insira o novo valor da carga (C):", initialvalue=charge['charge'])
+            if new_charge is not None:
+                charge['charge'] = new_charge  # Atualiza a carga
+
+            new_position = simpledialog.askstring("Editar Carga", "Insira a nova posição (x,y):", initialvalue=f"{charge['pos'][0]},{charge['pos'][1]}")
+            if new_position:
+                try:
+                    x, y = map(float, new_position.split(","))
+                    # Verifica se a nova carga colide com alguma carga existente
+                    for existing_charge in charges:
+                        if existing_charge != charge:  # Não verifica a própria carga
+                            distance = math.sqrt((existing_charge['pos'][0] - x)**2 + (existing_charge['pos'][1] - y)**2)
+                            if distance < 2:  # A distância mínima deve ser maior que o raio (20 pixels, então 2 é o limite)
+                                messagebox.showerror("Erro", "A nova posição colide com uma carga existente. Tente outra posição.")
+                                return  # Retorna sem atualizar a carga
+
+                    charge['pos'] = [x, y]  # Atualiza a posição
+                except ValueError:
+                    messagebox.showerror("Erro", "Posição inválida. Use o formato x,y.")
+        else:
+            messagebox.showerror("Erro", "Número da carga inválido.")
+
+
+background_image = pygame.image.load("fig/CoulombsLaw.png") 
+image_size = (512, 410)
+background_image = pygame.transform.scale(background_image, image_size)
+image_rect = background_image.get_rect()
+image_rect.center = (width // 2, height // 2)
+
+# Atualize o loop principal
 while running:
-    if not simulation_running:
+    if show_intro:
+        draw_intro()  # Chama a nova função para desenhar a tela inicial
+    elif not simulation_running:
         screen.fill(WHITE)
-        title_text = font.render("Simulador da Lei de Coulomb", True, BLACK)
-        start_text = font.render("Pressione 'Enter' para Iniciar", True, BLACK)
-        screen.blit(title_text, (width // 2 - title_text.get_width() // 2, height // 3))
-        screen.blit(start_text, (width // 2 - start_text.get_width() // 2, height // 2))
+        title_text = font.render("Lei de Coulomb", True, BLACK)
+        outline_rect = image_rect.inflate(10, 10)  # Aumenta o retângulo da imagem para o contorno
+        pygame.draw.rect(screen, BLACK, outline_rect, 2)
+        screen.blit(background_image, image_rect.topleft)
+        screen.blit(title_text, (width // 2 - title_text.get_width() // 2, height - 550 ))
+        pygame.display.update()
     else:
         screen.fill(WHITE)
         draw_grid()
         draw_charges()
-        for i in range(len(charges)):
-            for j in range(len(charges)):
-                if i != j:
-                    draw_force_vector(charges[i], charges[j])
+        draw_force_vectors()  # Chama a nova função para desenhar os vetores de força
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_RETURN and not simulation_running:
+            if show_intro and event.key == pygame.K_RETURN:
+                show_intro = False  # Oculta a tela inicial
+            elif event.key == pygame.K_RETURN and not simulation_running:
                 simulation_running = True
             elif event.key == pygame.K_ESCAPE and simulation_running:
                 simulation_running = False
             elif event.key == pygame.K_a and simulation_running:
                 add_charge_interface()
+            elif event.key == pygame.K_c and simulation_running:
+                edit_charge_interface()  # Chama a função para editar a carga
         elif event.type == pygame.MOUSEBUTTONDOWN and simulation_running:
             handle_click(pygame.mouse.get_pos())
 
     pygame.display.update()
     clock.tick(60)
+
 
 pygame.quit()
