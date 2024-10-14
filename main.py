@@ -5,11 +5,7 @@ from tkinter import simpledialog, messagebox
 
 pygame.init()
 
-width, height = 800, 600
-screen = pygame.display.set_mode((width, height))
-pygame.display.set_caption("Simulador da Lei de Coulomb")
-font = pygame.font.SysFont("Arial", 20)
-
+#CORES
 LIGHT_GRAY = (220, 220, 220)
 DARK_GRAY = (100, 100, 100)
 RED = (255, 0, 0)
@@ -17,6 +13,44 @@ BLUE = (0, 0, 255)
 GREEN = (0, 255, 0)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
+#TELA
+width, height = 800, 600
+screen = pygame.display.set_mode((width, height))
+pygame.display.set_caption("Simulador da Lei de Coulomb")
+#FONTES
+font = pygame.font.SysFont("Times New Roman", 20)
+bold_font = pygame.font.SysFont("Times New Roman", 20, bold=True) 
+underline_font = pygame.font.SysFont("Times New Roman", 50, italic=True)
+#IMAGENS
+background_image = pygame.image.load("fig/background.jpg").convert()
+law_image = pygame.image.load("fig/CoulombsLaw.png") 
+image_size = (512, 410)
+law_image = pygame.transform.scale(law_image, image_size)
+image_rect = law_image.get_rect()
+image_rect.center = (width // 2, height // 2)
+#BOTÔES
+button_rect = pygame.Rect(10, 10, 120, 30)  
+button_color = (0, 128, 255)
+button_text = font.render("Informações", True, BLACK)
+#INTERFACES
+def show_info_window():
+    root = tk.Tk()
+    root.title("Informações do Programa")
+    message = (
+        "Simulador da Lei de Coulomb\n\n"
+        "Este programa simula a interação entre cargas elétricas segundo a Lei de Coulomb.\n"
+        "Você pode adicionar, editar e visualizar as forças atuantes entre as cargas.\n\n"
+        "Comandos:\n"
+        "Pressione 'A' para adicionar uma carga\n"
+        "Pressione 'C' para editar uma carga\n"
+        "Clique em uma carga para ver as forças\n"
+        "Pressione 'R' para reiniciar a simulação."
+    )
+    label = tk.Label(root, text=message, padx=10, pady=10)
+    label.pack()
+    root.mainloop()
+
+
 
 # Constantes
 k = 8.99e9  # Constante de Coulomb
@@ -51,9 +85,9 @@ def calculate_force(q1, q2):
 
 def draw_grid():
     for x in range(0, width, SCALE):
-        pygame.draw.line(screen, DARK_GRAY, (x, 0), (x, height))
+        pygame.draw.line(screen, BLACK, (x, 0), (x, height))
     for y in range(0, height, SCALE):
-        pygame.draw.line(screen, DARK_GRAY, (0, y), (width, y))
+        pygame.draw.line(screen, BLACK, (0, y), (width, y))
     pygame.draw.line(screen, BLACK, (width // 2, 0), (width // 2, height), 2)  # Eixo Y
     pygame.draw.line(screen, BLACK, (0, height // 2), (width, height // 2), 2)  # Eixo X
 
@@ -132,15 +166,38 @@ def show_forces(q):
     root = tk.Tk()
     root.withdraw()  # Esconde a janela principal do Tkinter
     forces = []
+    total_force_x = 0
+    total_force_y = 0
+
     for other_charge in charges:
         if other_charge != q:
             force = calculate_force(q, other_charge)
-            forces.append(f"Força entre carga {q['number']} e carga {other_charge['number']}: "
-              f"Fx = {force[0]:.2e} N, Fy = {force[1]:.2e} N")
+            forces.append(
+                f"Força entre carga {q['number']} e carga {other_charge['number']}:\n"
+                f"  Fx = {force[0]:.2e} N\n"
+                f"  Fy = {force[1]:.2e} N\n"
+            )
+            total_force_x += force[0]
+            total_force_y += force[1]
 
-    
+    # Calcular a magnitude total da força uma vez
+    total_force_magnitude = math.sqrt(total_force_x**2 + total_force_y**2)
+
+    # Adiciona a força total na lista de forças
+    if forces:  # Verifica se há forças atuantes
+        forces.append(
+            f"Força Total atuante na carga {q['number']}:\n"
+            f"  Fx_total = {total_force_x:.2e} N\n"
+            f"  Fy_total = {total_force_y:.2e} N\n"
+            f"  Magnitude_total = {total_force_magnitude:.2e} N\n"
+        )
+    else:
+        forces.append("Sem Forças Atuantes")
+
+    # Exibe as forças em uma janela
     messagebox.showinfo("Forças Atuantes", "\n".join(forces))
     root.destroy()
+
 
 
 def add_charge_interface():
@@ -168,7 +225,7 @@ def handle_click(pos):
         pos_x = int(charge['pos'][0] * SCALE + width // 2)
         pos_y = int(height // 2 - charge['pos'][1] * SCALE)
         distance = math.sqrt((pos_x - pos[0])**2 + (pos_y - pos[1])**2)
-        if distance < 10:
+        if distance < 20:
             show_forces(charge)
 
 
@@ -181,17 +238,20 @@ show_intro = True
 # Função para desenhar a tela inicial
 def draw_intro():
     screen.fill(WHITE)
-    title_text = font.render("Simulador da Lei de Coulomb", True, BLACK)
-    instructions_text = font.render("Pressione 'Enter' para Iniciar", True, BLACK)
-    commands_text = font.render("Comandos:", True, BLACK)
+    screen.blit(background_image, (0, 0))
+    title_text = underline_font.render("Simulador da Lei de Coulomb", True, BLACK)
+    instructions_text = bold_font.render("Pressione 'Enter' para Iniciar", True, BLACK)
+    commands_text = bold_font.render("Comandos:", True, BLACK)
     command1_text = font.render("Pressione 'A' para adicionar uma carga", True, BLACK)
-    command2_text = font.render("Clique em uma carga para ver as forças", True, BLACK)
+    command2_text = font.render("Pressione 'C' para editar uma carga", True, BLACK)
+    command3_text = font.render("Clique em uma carga para ver as forças", True, BLACK)
 
     screen.blit(title_text, (width // 2 - title_text.get_width() // 2, height // 4))
     screen.blit(instructions_text, (width // 2 - instructions_text.get_width() // 2, height // 2))
     screen.blit(commands_text, (width // 2 - commands_text.get_width() // 2, height // 2 + 30))
     screen.blit(command1_text, (width // 2 - command1_text.get_width() // 2, height // 2 + 60))
     screen.blit(command2_text, (width // 2 - command2_text.get_width() // 2, height // 2 + 90))
+    screen.blit(command3_text, (width // 2 - command2_text.get_width() // 2, height // 2 + 120))
 
 def edit_charge_interface():
     charge_number = simpledialog.askinteger("Editar Carga", "Insira o número da carga:")
@@ -222,29 +282,28 @@ def edit_charge_interface():
             messagebox.showerror("Erro", "Número da carga inválido.")
 
 
-background_image = pygame.image.load("fig/CoulombsLaw.png") 
-image_size = (512, 410)
-background_image = pygame.transform.scale(background_image, image_size)
-image_rect = background_image.get_rect()
-image_rect.center = (width // 2, height // 2)
-
-# Atualize o loop principal
 while running:
     if show_intro:
         draw_intro()  # Chama a nova função para desenhar a tela inicial
     elif not simulation_running:
-        screen.fill(WHITE)
+        screen.fill(LIGHT_GRAY)
+        screen.blit(background_image, (0, 0))  
         title_text = font.render("Lei de Coulomb", True, BLACK)
-        outline_rect = image_rect.inflate(10, 10)  # Aumenta o retângulo da imagem para o contorno
+        screen.blit(law_image, image_rect.topleft)
+        outline_rect = image_rect.inflate(10, 10) 
         pygame.draw.rect(screen, BLACK, outline_rect, 2)
-        screen.blit(background_image, image_rect.topleft)
-        screen.blit(title_text, (width // 2 - title_text.get_width() // 2, height - 550 ))
+        screen.blit(title_text, (width // 2 - title_text.get_width() // 2, height - 550))        
         pygame.display.update()
     else:
-        screen.fill(WHITE)
+        screen.fill(DARK_GRAY)
         draw_grid()
         draw_charges()
-        draw_force_vectors()  # Chama a nova função para desenhar os vetores de força
+        draw_force_vectors()
+        pygame.draw.rect(screen, button_color, button_rect)
+        outline_rect = button_rect.inflate(5, 5)
+        pygame.draw.rect(screen, BLACK, outline_rect, 2)
+        screen.blit(button_text, (button_rect.x + 10, button_rect.y + 5))  # Centraliza o texto no botão
+        
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -259,12 +318,16 @@ while running:
             elif event.key == pygame.K_a and simulation_running:
                 add_charge_interface()
             elif event.key == pygame.K_c and simulation_running:
-                edit_charge_interface()  # Chama a função para editar a carga
+                edit_charge_interface()  
+            elif event.key == pygame.K_r:  
+                charges.clear()
         elif event.type == pygame.MOUSEBUTTONDOWN and simulation_running:
             handle_click(pygame.mouse.get_pos())
+            mouse_pos = pygame.mouse.get_pos()
+            if button_rect.collidepoint(mouse_pos):  # Verifica se o botão foi clicado
+                show_info_window()
 
     pygame.display.update()
     clock.tick(60)
-
 
 pygame.quit()
