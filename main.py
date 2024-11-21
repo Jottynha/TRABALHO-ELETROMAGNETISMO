@@ -4,6 +4,8 @@ import tkinter as tk
 from tkinter import scrolledtext
 from tkinter import simpledialog, messagebox
 import threading
+import subprocess
+import json 
 
 pygame.init()
 
@@ -59,7 +61,7 @@ input_boxes = [
     pygame.Rect(input_start_x, input_start_y + 50, input_box_width, input_box_height)
 ]
 add_button = pygame.Rect(input_start_x, input_start_y + 110, 100, 30)
-input_labels = ["Valor da Carga (C)", "Posição (x, y)"]
+input_labels = ["Valor da Carga (C)", "Posição (x, y) em m"]
 label_surfaces = [font.render(label, True, (0, 0, 0)) for label in input_labels]
 
 #INTERFACES
@@ -551,6 +553,10 @@ def reset_simulation():
 
 ruler = Ruler()
 
+def execute_campo_eletrico():
+    with open("charges.json", "w") as f:
+        json.dump(charges, f)
+    subprocess.run(["python3", "campo_eletrico.py"])
 
 while running:
     if show_intro:
@@ -574,7 +580,7 @@ while running:
         pygame.draw.rect(screen, button_color, button_rect)
         outline_rect = button_rect.inflate(5, 5)
         pygame.draw.rect(screen, BLACK, outline_rect, 2)
-        screen.blit(button_text, (button_rect.x + 10, button_rect.y + 5))  # Centraliza o texto no botão
+        screen.blit(button_text, (button_rect.x + 10, button_rect.y + 5))
 
     for event in pygame.event.get():
         handle_input_events(event)
@@ -601,7 +607,10 @@ while running:
                 delete_charge()
             elif event.key == pygame.K_q:
                 reset_simulation()
-            if event.key == pygame.K_LEFT:
+            elif event.key == pygame.K_z:
+                # Salvar charges.json e executar o subprocess em thread
+                threading.Thread(target=execute_campo_eletrico).start()
+            elif event.key == pygame.K_LEFT:
                 ruler.rotate(-5)  # Rotaciona a régua para a esquerda
             elif event.key == pygame.K_RIGHT:
                 ruler.rotate(5)   # Rotaciona a régua para a direita
@@ -616,6 +625,7 @@ while running:
         elif event.type == pygame.MOUSEBUTTONUP:
             if event.button == 1:
                 ruler.stop_drag()
+
     # Atualiza a posição de arraste
     mouse_pos = pygame.mouse.get_pos()
     ruler.update_drag(mouse_pos)
@@ -623,4 +633,3 @@ while running:
     clock.tick(60)
 
 pygame.quit()
-
