@@ -8,6 +8,7 @@ import threading
 pygame.init()
 
 #CORES
+
 LIGHT_GRAY = (220, 220, 220)
 DARK_GRAY = (100, 100, 100)
 RED = (255, 0, 0)
@@ -15,26 +16,54 @@ BLUE = (0, 0, 255)
 GREEN = (0, 255, 0)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
+
 #TELA
-width, height = 800, 600
+
+width, height = 1300, 700
 screen = pygame.display.set_mode((width, height))
 pygame.display.set_caption("Simulador da Lei de Coulomb")
+
 #FONTES
+
 font = pygame.font.SysFont("Times New Roman", 20)
 bold_font = pygame.font.SysFont("Times New Roman", 20, bold=True) 
 underline_font = pygame.font.SysFont("Times New Roman", 50, italic=True)
+
 #IMAGENS
+
 background_image = pygame.image.load("fig/background.jpg").convert()
 law_image = pygame.image.load("fig/CoulombsLaw.png") 
 image_size = (512, 410)
 law_image = pygame.transform.scale(law_image, image_size)
 image_rect = law_image.get_rect()
 image_rect.center = (width // 2, height // 2)
-#BOTÔES
+
+#BOTÕES
+
 button_rect = pygame.Rect(10, 10, 120, 30)  
 button_color = (0, 128, 255)
 button_text = font.render("Informações", True, BLACK)
+
+#INTERFACE DE ADICIONAR CARGA
+
+input_active = [False, False]
+input_texts = ["", ""]
+input_box_width = 200
+input_box_height = 30
+margin_top = 20
+margin_right = 20
+input_start_x = width - input_box_width - margin_right
+input_start_y = margin_top
+input_boxes = [
+    pygame.Rect(input_start_x, input_start_y, input_box_width, input_box_height),
+    pygame.Rect(input_start_x, input_start_y + 50, input_box_width, input_box_height)
+]
+add_button = pygame.Rect(input_start_x, input_start_y + 110, 100, 30)
+input_labels = ["Valor da Carga (C)", "Posição (x, y)"]
+label_surfaces = [font.render(label, True, (0, 0, 0)) for label in input_labels]
+
 #INTERFACES
+
 def show_info_window():
     def open_window():
         root = tk.Tk()
@@ -50,6 +79,8 @@ def show_info_window():
             "Pressione 'D' para deletar uma carga.\n"
             "Clique em uma carga para ver as forças\n"
             "Pressione 'R' para reiniciar a simulação.\n"
+            "Pressione 'U' para aumentar o tamanho da régua em uma unidade.\n"
+            "Pressione 'E' para diminuir o tamanho da régua em uma unidade.\n"
         )
         
         label = tk.Label(root, text=message, padx=10, pady=10)
@@ -58,7 +89,7 @@ def show_info_window():
         # Botão para importar cargas
         import_button = tk.Button(root, text="Importar Cargas", command=lambda: importar_cargas('cargas.txt'))
         import_button.pack(pady=10)  # Adiciona o botão com espaçamento vertical
-        
+
         def visualizar_arquivo():
             try:
                 with open('cargas.txt', 'r') as file:
@@ -104,6 +135,66 @@ def show_info_window():
     # Abrir janela de Tkinter em uma nova thread
     threading.Thread(target=open_window).start()
 
+def draw_input_fields():
+    """Desenha os campos de entrada e o botão no canto superior direito."""
+    for i, box in enumerate(input_boxes):
+        color = DARK_GRAY if input_active[i] else LIGHT_GRAY
+        pygame.draw.rect(screen, color, box, 0)  # Caixa preenchida
+        pygame.draw.rect(screen, BLACK, box, 2)  # Contorno da caixa
+
+        # Renderiza o texto digitado ou o placeholder
+        if input_texts[i]:  # Se houver texto no campo
+            text_surface = font.render(input_texts[i], True, BLACK)
+        else:  # Campo vazio: renderiza o placeholder
+            text_surface = font.render(input_labels[i], True, LIGHT_GRAY)
+
+        # Renderiza o texto (digitado ou placeholder)
+        screen.blit(text_surface, (box.x + 5, box.y + 5))
+
+    # Botão "Adicionar"
+    pygame.draw.rect(screen, BLUE, add_button)
+    add_text = font.render("Adicionar", True, WHITE)
+    screen.blit(add_text, (add_button.x + 10, add_button.y + 5))
+
+# Função para adicionar uma nova carga
+def add_charge():
+    try:
+        charge_value = float(input_texts[0])
+        position = eval(input_texts[1])  # Avalia a posição como uma tupla
+        if isinstance(position, tuple) and len(position) == 2:
+            new_charge = {"charge": charge_value, "pos": position, "number": len(charges) + 1}
+            charges.append(new_charge)
+            print(f"Carga adicionada: {new_charge}")
+        else:
+            raise ValueError("A posição deve ser uma tupla (x, y).")
+    except Exception as e:
+        print(f"Erro ao adicionar carga: {e}")
+
+# Atualizar evento principal
+def handle_input_events(event):
+    global input_active
+
+    if event.type == pygame.MOUSEBUTTONDOWN:
+        # Verificar se algum campo foi clicado
+        for i, box in enumerate(input_boxes):
+            if box.collidepoint(event.pos):
+                input_active[i] = True
+            else:
+                input_active[i] = False
+        # Verificar clique no botão "Adicionar"
+        if add_button.collidepoint(event.pos):
+            add_charge()
+
+    elif event.type == pygame.KEYDOWN:
+        for i in range(len(input_boxes)):
+            if input_active[i]:  # Apenas processar texto no campo ativo
+                if event.key == pygame.K_RETURN:
+                    input_active[i] = False  # Desativa o campo ao pressionar Enter
+                elif event.key == pygame.K_BACKSPACE:
+                    input_texts[i] = input_texts[i][:-1]  # Remove o último caractere
+                else:
+                    input_texts[i] += event.unicode  # Adiciona o caractere digitado
+
 
 
 # Constantes
@@ -115,7 +206,6 @@ VECTOR_LENGTH = 50  # Comprimento máximo dos vetores em pixels
 charges = []
 simulation_running = False
 
-# Função para calcular a força entre duas cargas
 def calculate_force(q1, q2):
     dx = q2['pos'][0] - q1['pos'][0]
     dy = q2['pos'][1] - q1['pos'][1]
@@ -129,12 +219,85 @@ def calculate_force(q1, q2):
 
     force_x = math.cos(angle) * force_magnitude
     force_y = math.sin(angle) * force_magnitude
-
-    # Se as cargas forem do mesmo sinal, força de repulsão (afasta)
     if q1['charge'] * q2['charge'] > 0:
         return [-force_x, -force_y]  # Repulsão
     else:
         return [force_x, force_y]  # Atração
+
+
+# Definições da régua
+class Ruler:
+    def __init__(self, length=200, scale=SCALE):
+        self.length = length            # Comprimento da régua em pixels
+        self.scale = scale              # Escala em pixels por unidade
+        self.angle = 0                  # Ângulo inicial da régua em graus
+        self.position = (400, 300)      # Posição inicial (centro da régua)
+        self.is_dragging = False        # Estado de arraste da régua
+
+    def draw(self, screen):
+        # Calcula os pontos de extremidade da régua com base no ângulo
+        x1 = self.position[0] + (self.length / 2) * math.cos(math.radians(self.angle))
+        y1 = self.position[1] + (self.length / 2) * math.sin(math.radians(self.angle))
+        x2 = self.position[0] - (self.length / 2) * math.cos(math.radians(self.angle))
+        y2 = self.position[1] - (self.length / 2) * math.sin(math.radians(self.angle))
+
+        # Desenha a linha principal da régua
+        pygame.draw.line(screen, (0, 0, 0), (x1, y1), (x2, y2), 3)
+
+        # Definir o número de marcas e o intervalo em unidades de Coulomb
+        num_ticks = 10  # Número de marcas
+        tick_distance = self.length / num_ticks
+        unit_distance = tick_distance / self.scale  # Distância em unidades de Coulomb
+
+        # Desenha as marcas de escala e os rótulos
+        for i in range(num_ticks + 1):
+            # Calcula a posição da marca
+            tick_ratio = i / num_ticks
+            tick_x = x2 + tick_ratio * (x1 - x2)
+            tick_y = y2 + tick_ratio * (y1 - y2)
+            tick_length = 12 if i % 2 == 0 else 6  # Marcas maiores a cada 20 pixels
+
+            # Calcula a orientação da marca com base no ângulo da régua
+            offset_x = tick_length * math.sin(math.radians(self.angle))
+            offset_y = -tick_length * math.cos(math.radians(self.angle))
+
+            # Desenha a marca
+            pygame.draw.line(screen, (0, 0, 0), 
+                             (tick_x - offset_x, tick_y - offset_y), 
+                             (tick_x + offset_x, tick_y + offset_y), 2)
+
+            # Adiciona os rótulos nas marcas principais
+            if i % 2 == 0:
+                font = pygame.font.SysFont("Times New Roman", 13)  
+                label_text = f"{i * unit_distance:.1f} m"  # Valor em unidades de Coulomb
+                label_surface = font.render(label_text, True, (0, 0, 0))
+                label_x = tick_x + offset_x * 1.5
+                label_y = tick_y + offset_y * 1.5
+                screen.blit(label_surface, (label_x, label_y))
+
+    def rotate(self, angle_change):
+        # Atualiza o ângulo da régua
+        self.angle = (self.angle + angle_change) % 360
+
+    def set_position(self, position):
+        # Atualiza a posição da régua
+        self.position = position
+
+    def start_drag(self):
+        self.is_dragging = True
+
+    def stop_drag(self):
+        self.is_dragging = False
+
+    def update_drag(self, mouse_position):
+        if self.is_dragging:
+            self.set_position(mouse_position)
+
+    def increase_scale(self):
+        self.length += 20
+    
+    def decrease_scale(self):
+        self.length -= 20
 
 
 def draw_grid():
@@ -223,9 +386,17 @@ def show_forces(q):
     total_force_x = 0
     total_force_y = 0
     forces.append(f"Carga {q['number']} com valor de {q['charge']} C.")
+    
     for other_charge in charges:
         if other_charge != q:
             force = calculate_force(q, other_charge)
+            
+            # Verificar se as cargas têm a mesma posição no eixo X ou Y
+            if q['pos'][0] == other_charge['pos'][0]:  # Mesma posição no eixo X
+                force[0] = 0  # Força em X será zero
+            if q['pos'][1] == other_charge['pos'][1]:  # Mesma posição no eixo Y
+                force[1] = 0  # Força em Y será zero
+
             forces.append(
                 f"Força entre carga {q['number']} e carga {other_charge['number']}:\n"
                 f"  Fx = {force[0]:.2e} N\n"
@@ -250,6 +421,7 @@ def show_forces(q):
 
     messagebox.showinfo("Forças Atuantes", "\n".join(forces))
     root.destroy()
+
 
 def importar_cargas(arquivo):
     global charges
@@ -377,13 +549,14 @@ def reset_simulation():
     simulation_running = False
     charges.clear()
 
+ruler = Ruler()
 
 
 while running:
     if show_intro:
         draw_intro()
     elif not simulation_running:
-        screen.fill(LIGHT_GRAY)
+        screen.fill(WHITE)
         screen.blit(background_image, (0, 0))
         title_text = font.render("Lei de Coulomb", True, BLACK)
         screen.blit(law_image, image_rect.topleft)
@@ -392,16 +565,19 @@ while running:
         screen.blit(title_text, (width // 2 - title_text.get_width() // 2, height - 550))
         pygame.display.update()
     else:
-        screen.fill(DARK_GRAY)
+        screen.fill(WHITE)
+        ruler.draw(screen)
         draw_grid()
         draw_charges()
         draw_force_vectors()
+        draw_input_fields()
         pygame.draw.rect(screen, button_color, button_rect)
         outline_rect = button_rect.inflate(5, 5)
         pygame.draw.rect(screen, BLACK, outline_rect, 2)
         screen.blit(button_text, (button_rect.x + 10, button_rect.y + 5))  # Centraliza o texto no botão
 
     for event in pygame.event.get():
+        handle_input_events(event)
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.KEYDOWN:
@@ -417,18 +593,34 @@ while running:
                 edit_charge_interface()
             elif event.key == pygame.K_r:
                 charges.clear()
+            elif event.key == pygame.K_u:
+                ruler.increase_scale()
+            elif event.key == pygame.K_e:
+                ruler.decrease_scale()
             elif event.key == pygame.K_d:
                 delete_charge()
             elif event.key == pygame.K_q:
                 reset_simulation()
+            if event.key == pygame.K_LEFT:
+                ruler.rotate(-5)  # Rotaciona a régua para a esquerda
+            elif event.key == pygame.K_RIGHT:
+                ruler.rotate(5)   # Rotaciona a régua para a direita
         elif event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:  # Botão esquerdo do mouse
+                ruler.start_drag()
             mouse_pos = pygame.mouse.get_pos()
             if simulation_running:
                 handle_click(mouse_pos)
             if button_rect.collidepoint(mouse_pos):  # Verifica se o botão de reinício foi clicado
                 show_info_window()
-
+        elif event.type == pygame.MOUSEBUTTONUP:
+            if event.button == 1:
+                ruler.stop_drag()
+    # Atualiza a posição de arraste
+    mouse_pos = pygame.mouse.get_pos()
+    ruler.update_drag(mouse_pos)
     pygame.display.update()
     clock.tick(60)
 
 pygame.quit()
+
