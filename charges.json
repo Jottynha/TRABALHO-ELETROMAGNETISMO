@@ -1,1 +1,1 @@
-[{"charge": 10.0, "pos": [0, 0], "number": 1}, {"charge": -10.0, "pos": [10.0, 10.0], "number": 2}, {"charge": 10.0, "pos": [-10.0, -10.0], "number": 3}]
+[{"charge": 1.0, "pos": [1, 1], "number": 1}]

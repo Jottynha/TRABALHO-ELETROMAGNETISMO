@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-import json  # Para carregar o vetor charges
+import json 
 
 def load_charges(filename="charges.json"):
     if not os.path.exists(filename):
@@ -13,18 +13,15 @@ def load_charges(filename="charges.json"):
             return json.load(f)
         except json.JSONDecodeError as e:
             raise ValueError(f"Erro ao decodificar o JSON: {e}")
-
-# Carregar o vetor de cargas
+        
 charges = load_charges()
 
-# Constante de Coulomb (em unidades apropriadas)
-k = 8.9875517923e9  # N·m²/C²
+k = 8.9875517923e9  # Constante de Coulomb (em unidades apropriadas) N·m²/C²
 
-# Funções para calcular e plotar o campo elétrico (mantém o código anterior)
 def electric_field(q, r_pos, r_point):
     r = r_point - r_pos
     r_magnitude = np.linalg.norm(r)
-    if r_magnitude == 0:  # Evitar divisão por zero
+    if r_magnitude == 0:
         return np.array([0, 0])
     return k * q * r / r_magnitude**3
 
@@ -44,30 +41,18 @@ def calculate_field(charges, x_range=(-20, 20), y_range=(-20, 20), resolution=50
 
 def plot_field(charges, X, Y, Ex, Ey):
     plt.figure(figsize=(8, 8))
-    
-    # Calculando a magnitude do campo elétrico
     magnitude = np.sqrt(Ex**2 + Ey**2)
-    
     # Encontrando o valor mínimo e máximo da magnitude do campo
     min_magnitude = np.min(magnitude)
     max_magnitude = np.max(magnitude)
-    
-    # Definindo o scale_factor para o tamanho das setas
-    scale_factor = 2  # O tamanho das setas será escalado proporcionalmente
-    
+    scale_factor = 2
     # Normalizando as setas de acordo com a magnitude
     Ex_norm = Ex * scale_factor / magnitude
     Ey_norm = Ey * scale_factor / magnitude
-    
-    # Plotando os vetores do campo elétrico com cores baseadas na magnitude
     quiver = plt.quiver(X, Y, Ex_norm, Ey_norm, magnitude, pivot='middle', cmap='coolwarm', scale=50)
-    
-    # Plotando as cargas
     for charge in charges:
         color = 'red' if charge["charge"] > 0 else 'blue'
         plt.scatter(*np.array(charge["pos"]), color=color, s=150, label=f"q = {charge['charge']} C")  # Sem a divisão por 100
-    
-    # Definindo os limites do gráfico
     plt.xlim(X.min(), X.max())
     plt.ylim(Y.min(), Y.max())
     plt.xlabel('x (m)')
@@ -83,7 +68,5 @@ def plot_field(charges, X, Y, Ex, Ey):
     plt.grid()
     plt.show()
 
-
-# Executando a simulação
 X, Y, Ex, Ey = calculate_field(charges, x_range=(-20, 20), y_range=(-20, 20), resolution=50)
 plot_field(charges, X, Y, Ex, Ey)

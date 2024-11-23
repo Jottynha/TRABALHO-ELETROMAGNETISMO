@@ -9,6 +9,8 @@ import json
 
 pygame.init()
 
+show_resultant_force = True
+
 #CORES
 
 LIGHT_GRAY = (220, 220, 220)
@@ -53,8 +55,8 @@ input_texts = ["", ""]
 input_box_width = 200
 input_box_height = 30
 margin_top = 20
-margin_right = 20
-input_start_x = width - input_box_width - margin_right
+margin_left = 20
+input_start_x = width - input_box_width - margin_left
 input_start_y = margin_top
 input_boxes = [
     pygame.Rect(input_start_x, input_start_y, input_box_width, input_box_height),
@@ -79,10 +81,11 @@ def show_info_window():
             "Pressione 'A' para adicionar uma carga\n"
             "Pressione 'C' para editar uma carga\n"
             "Pressione 'D' para deletar uma carga.\n"
-            "Clique em uma carga para ver as forças\n"
             "Pressione 'R' para reiniciar a simulação.\n"
             "Pressione 'U' para aumentar o tamanho da régua em uma unidade.\n"
             "Pressione 'E' para diminuir o tamanho da régua em uma unidade.\n"
+            "Pressione 'F' para ver as forças separadamente.\n"
+            "Clique em uma carga para ver as forças\n"
         )
         
         label = tk.Label(root, text=message, padx=10, pady=10)
@@ -321,8 +324,8 @@ def draw_charges():
         color = RED if charge['charge'] > 0 else BLUE
         
         # Desenha a carga (círculo)
-        pygame.draw.circle(screen, color, (pos_x, pos_y), 20)
-        pygame.draw.circle(screen, BLACK, (pos_x, pos_y), 20, 2)  # Contorno
+        pygame.draw.circle(screen, color, (pos_x, pos_y), 12)
+        pygame.draw.circle(screen, BLACK, (pos_x, pos_y), 12, 2)  # Contorno
 
         
         # Desenha o número da carga dentro do círculo
@@ -330,56 +333,77 @@ def draw_charges():
         screen.blit(charge_number_text, (pos_x - charge_number_text.get_width() // 2, pos_y - charge_number_text.get_height() // 2))
 
 
+def draw_arrow(start_x, start_y, end_x, end_y, color):
+    """Desenha uma linha com uma seta na extremidade."""
+    pygame.draw.line(screen, color, (start_x, start_y), (end_x, end_y), 2)
+
+    # Calcula o ângulo da linha
+    arrow_length = 10
+    arrow_angle = math.pi / 6  # Ângulo da seta
+    angle = math.atan2(end_y - start_y, end_x - start_x)  # Ângulo entre pontos
+
+    # Calcula os dois pontos da base da seta
+    arrow_point1 = (
+        end_x - arrow_length * math.cos(angle - arrow_angle),
+        end_y - arrow_length * math.sin(angle - arrow_angle)
+    )
+    arrow_point2 = (
+        end_x - arrow_length * math.cos(angle + arrow_angle),
+        end_y - arrow_length * math.sin(angle + arrow_angle)
+    )
+
+    # Desenha a seta como um triângulo
+    pygame.draw.polygon(screen, color, [arrow_point1, arrow_point2, (end_x, end_y)])
+
 def draw_force_vectors():
+    """Desenha as forças (resultante ou separadas) com setas."""
     for i in range(len(charges)):
         total_force_x = 0
         total_force_y = 0
-        
+
         for j in range(len(charges)):
             if i != j:
                 force = calculate_force(charges[i], charges[j])
+
+                if not show_resultant_force:
+                    # Desenha as forças separadas
+                    pos_x1 = int(charges[i]['pos'][0] * SCALE + width // 2)
+                    pos_y1 = int(height // 2 - charges[i]['pos'][1] * SCALE)
+
+                    magnitude = math.sqrt(force[0]**2 + force[1]**2)
+                    if magnitude > 0:
+                        unit_fx = force[0] / magnitude
+                        unit_fy = force[1] / magnitude
+                        scaled_length = min(magnitude * 0.0001, VECTOR_LENGTH)
+
+                        end_x = pos_x1 + unit_fx * scaled_length
+                        end_y = pos_y1 - unit_fy * scaled_length
+
+                        # Desenha a linha com a seta
+                        draw_arrow(pos_x1, pos_y1, end_x, end_y, RED)
+
+                # Soma as forças para a força resultante
                 total_force_x += force[0]
                 total_force_y += force[1]
 
-        # Calcula a magnitude total da força
-        total_force_magnitude = math.sqrt(total_force_x**2 + total_force_y**2)
-        
-        pos_x1 = int(charges[i]['pos'][0] * SCALE + width // 2)
-        pos_y1 = int(height // 2 - charges[i]['pos'][1] * SCALE)
+        if show_resultant_force:
+            # Desenha a força resultante
+            total_force_magnitude = math.sqrt(total_force_x**2 + total_force_y**2)
+            pos_x1 = int(charges[i]['pos'][0] * SCALE + width // 2)
+            pos_y1 = int(height // 2 - charges[i]['pos'][1] * SCALE)
 
-        # Normaliza o vetor para que tenha um comprimento máximo proporcional ao total da força
-        if total_force_magnitude > 0:
-            unit_fx = total_force_x / total_force_magnitude
-            unit_fy = total_force_y / total_force_magnitude
-            # Aumenta o comprimento do vetor proporcionalmente à força total
-            scaled_length = min(total_force_magnitude * 0.0001, VECTOR_LENGTH)
-        else:
-            continue 
+            if total_force_magnitude > 0:
+                unit_fx = total_force_x / total_force_magnitude
+                unit_fy = total_force_y / total_force_magnitude
+                scaled_length = min(total_force_magnitude * 0.0001, VECTOR_LENGTH)
 
-        # Calcula o ponto final da seta baseado na direção da força
-        end_x = pos_x1 + unit_fx * scaled_length
-        end_y = pos_y1 - unit_fy * scaled_length
-        
-        pygame.draw.line(screen, GREEN, (pos_x1, pos_y1), (end_x, end_y), 2)
+                end_x = pos_x1 + unit_fx * scaled_length
+                end_y = pos_y1 - unit_fy * scaled_length
+                draw_arrow(pos_x1, pos_y1, end_x, end_y, GREEN)
 
-        # Desenhar a seta na extremidade do vetor
-        arrow_length = 10
-        arrow_angle = math.pi / 6  # Ângulo da seta
-        angle = math.atan2(-unit_fy, unit_fx)  # Ângulo baseado na direção do vetor de força
-
-        # Posição dos dois pontos que formam a seta
-        arrow_point1 = (
-            end_x - arrow_length * math.cos(angle + arrow_angle),
-            end_y - arrow_length * math.sin(angle + arrow_angle)
-        )
-        arrow_point2 = (
-            end_x - arrow_length * math.cos(angle - arrow_angle),
-            end_y - arrow_length * math.sin(angle - arrow_angle)
-        )
-
-        # Desenha a seta
-        pygame.draw.polygon(screen, GREEN, [arrow_point1, arrow_point2, (end_x, end_y)])
-
+def toggle_force_mode():
+    global show_resultant_force
+    show_resultant_force = not show_resultant_force
 
 def show_forces(q):
     root = tk.Tk()
@@ -433,7 +457,7 @@ def importar_cargas(arquivo):
             for idx, line in enumerate(file):
                 parts = line.split()  # Divide a linha em partes
                 pos_part = parts[1].split(',')
-                pos_x, pos_y = int(pos_part[0]), int(pos_part[1])
+                pos_x, pos_y = float(pos_part[0]), float(pos_part[1])
                 
                 charge_value = float(parts[3])
                 
@@ -599,6 +623,8 @@ while running:
                 edit_charge_interface()
             elif event.key == pygame.K_r:
                 charges.clear()
+            elif event.key == pygame.K_f:
+                toggle_force_mode()
             elif event.key == pygame.K_u:
                 ruler.increase_scale()
             elif event.key == pygame.K_e:
@@ -615,7 +641,7 @@ while running:
             elif event.key == pygame.K_RIGHT:
                 ruler.rotate(5)   # Rotaciona a régua para a direita
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:  # Botão esquerdo do mouse
+            if event.button == 1:
                 ruler.start_drag()
             mouse_pos = pygame.mouse.get_pos()
             if simulation_running:
