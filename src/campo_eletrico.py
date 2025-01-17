@@ -3,18 +3,38 @@ import matplotlib.pyplot as plt
 import os
 import json 
 
-def load_charges(filename="charges.json"):
-    if not os.path.exists(filename):
-        raise FileNotFoundError(f"O arquivo '{filename}' não existe.")
-    if os.path.getsize(filename) == 0:
-        raise ValueError(f"O arquivo '{filename}' está vazio.")
-    with open(filename, "r") as f:
+def load_charges(txt_filename="cargas.txt", json_filename="charges.json"):
+    if not os.path.exists(json_filename):
+        if not os.path.exists(txt_filename):
+            raise FileNotFoundError(f"O arquivo '{txt_filename}' não existe.")
+        if os.path.getsize(txt_filename) == 0:
+            raise ValueError(f"O arquivo '{txt_filename}' está vazio.")
+        charges = []
+        with open(txt_filename, "r") as txt_file:
+            for line in txt_file:
+                try:
+                    line = line.strip()
+                    parts = line.split(" ")
+                    pos_part = next((p for p in parts if p.startswith("pos:")), None)
+                    if pos_part is None:
+                        raise ValueError(f"Faltando campo 'pos' na linha: {line}")
+                    pos_values = pos_part.split(":")[1].split(",")
+                    pos = [float(val) for val in pos_values]
+                    charge_part = next((p for p in parts if p.startswith("charge:")), None)
+                    if charge_part is None:
+                        raise ValueError(f"Faltando campo 'charge' na linha: {line}")
+                    charge = float(charge_part.split(":")[1])
+                    charges.append({"pos": pos, "charge": charge})
+                except Exception as e:
+                    raise ValueError(f"Erro ao processar a linha '{line}': {e}")
+        with open(json_filename, "w") as json_file:
+            json.dump(charges, json_file, indent=4)
+        print(f"Arquivo '{txt_filename}' convertido para '{json_filename}'.")
+    with open(json_filename, "r") as json_file:
         try:
-            return json.load(f)
+            return json.load(json_file)
         except json.JSONDecodeError as e:
             raise ValueError(f"Erro ao decodificar o JSON: {e}")
-        
-charges = load_charges()
 
 k = 8.9875517923e9  # Constante de Coulomb (em unidades apropriadas) N·m²/C²
 
@@ -68,5 +88,3 @@ def plot_field(charges, X, Y, Ex, Ey):
     plt.grid()
     plt.show()
 
-X, Y, Ex, Ey = calculate_field(charges, x_range=(-20, 20), y_range=(-20, 20), resolution=50)
-plot_field(charges, X, Y, Ex, Ey)
