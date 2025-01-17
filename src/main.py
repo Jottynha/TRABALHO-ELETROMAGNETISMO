@@ -16,13 +16,32 @@ class PygameWidget(QWidget):
         Salva as cargas atuais no arquivo JSON e plota o campo elétrico.
         """
         try:
-            self.salvar()
+            self.salvar_campo()
             charges = campo_eletrico.load_charges()
             X, Y, Ex, Ey = campo_eletrico.calculate_field(charges, x_range=(-20, 20), y_range=(-20, 20), resolution=50)
             campo_eletrico.plot_field(charges, X, Y, Ex, Ey)
 
         except Exception as e:
             print(f"Erro ao visualizar o campo elétrico: {e}")
+    def visualizar_dados_cargas(self):
+        """
+        Exibe os dados de todas as cargas enquanto houverem cargas disponíveis.
+        """
+        try:
+            charge_number = 1  # Começa com o número da primeira carga
+            while True:
+                charge = self.buscarCharge(charge_number)
+                if charge is not None:
+                    Interface.display_charge_data(charge_number)
+                    charge_number += 1  # Incrementa o número da carga para buscar a próxima
+                else:
+                    # Se a carga não for encontrada, sai do loop
+                    break
+                    
+        except Exception as e:
+            print(f"Erro ao visualizar os dados das cargas: {e}")
+
+            
     def __init__(self, largura_janela, altura_janela, parent=None):
         super().__init__(parent)
         self.width = largura_janela
@@ -225,7 +244,7 @@ class PygameWidget(QWidget):
 
                         
 
-    def salvar(self, name_arquivo="charges.json"):
+    def salvar_campo(self, name_arquivo="cargas.txt"):
         try:
             # Converter as cargas para o formato correto
             charges_to_save = [
@@ -244,7 +263,14 @@ class PygameWidget(QWidget):
             print("Cargas salvas com sucesso no arquivo JSON!")
         except Exception as e:
             print(f"Erro ao salvar o arquivo JSON: {e}")
-
+    def salvar(self):
+        try:
+            with open(name_arquivo, 'w') as file:
+                for charge in self.charges:
+                    file.write(f"pos: {charge['pos'][0]},{charge['pos'][1]} charge: {charge['charge']}\n")
+            print("Cargas salvas com sucesso!")
+        except Exception as e:
+            print(f"Erro ao salvar o arquivo: {e}")
 
     def calculate_force(self,q1, q2):
         k = 8.99e9  # Constante eletrostática
@@ -447,7 +473,7 @@ class Interface(QMainWindow):
 
         self.largura_janela = self.size().width()
         self.altura_janela = self.size().height()
-        print(self.largura_janela*0.8, self.altura_janela*0.9)
+        print(self.largura_janela*0.7, self.altura_janela*0.9)
 
 
         self.aviso = QLabel()
@@ -543,7 +569,8 @@ class Interface(QMainWindow):
 
     def visualizar_campo_eletrico(self):
         self.pygame_widget.visualizar_campo_eletrico()
-
+    def visualizar_cargas(self):
+        self.pygame_widget.visualizar_dados_cargas()
     def vazio(self):
        pass
 
@@ -570,7 +597,7 @@ class Interface(QMainWindow):
             ("Importar", self.importar_arquivo),
             ("Salvar", self.salvar_arquivo),
             ("Visualizar forças separadas ou resultante", self.F_resultante_ou_separada),
-            ("Visualizar cargas no sistema", self.vazio),
+            ("Visualizar cargas no sistema", self.visualizar_cargas),
             ("Visualizar campo elétrico", self.visualizar_campo_eletrico),
         ]
 
