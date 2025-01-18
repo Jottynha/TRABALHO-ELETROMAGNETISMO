@@ -23,23 +23,8 @@ class PygameWidget(QWidget):
 
         except Exception as e:
             print(f"Erro ao visualizar o campo elétrico: {e}")
-    def visualizar_dados_cargas(self):
-        """
-        Exibe os dados de todas as cargas enquanto houverem cargas disponíveis.
-        """
-        try:
-            charge_number = 1  # Começa com o número da primeira carga
-            while True:
-                charge = self.buscarCharge(charge_number)
-                if charge is not None:
-                    Interface.display_charge_data(charge_number)
-                    charge_number += 1  # Incrementa o número da carga para buscar a próxima
-                else:
-                    # Se a carga não for encontrada, sai do loop
-                    break
-                    
-        except Exception as e:
-            print(f"Erro ao visualizar os dados das cargas: {e}")
+    def visualizar_dados_cargas(self):  
+        Interface.display_all_charges_data(self)
 
             
     def __init__(self, largura_janela, altura_janela, parent=None):
@@ -82,12 +67,15 @@ class PygameWidget(QWidget):
         mid_x, mid_y = width // 2, height // 2
 
         spacing = 20
+        self.num_pos = [0, 0]
 
         # Desenha a grade alinhada
         for x in range(mid_x % spacing, width, spacing):  # Linhas verticais
             pygame.draw.line(self.screen, (200, 200, 200), (x, 0), (x, height))
+            self.num_pos[0] += 1
         for y in range(mid_y % spacing, height, spacing):  # Linhas horizontais
             pygame.draw.line(self.screen, (200, 200, 200), (0, y), (width, y))
+            self.num_pos[1] += 1
 
         pygame.draw.line(self.screen, (0, 0, 0), (0, mid_y), (width, mid_y), 2)  # Eixo X
         pygame.draw.line(self.screen, (0, 0, 0), (mid_x, 0), (mid_x, height), 2)  # Eixo Y
@@ -130,6 +118,24 @@ class PygameWidget(QWidget):
         image_data = pygame.image.tostring(self.screen, "RGB")
         qimage = QImage(image_data, width, height, QImage.Format_RGB888)
         self.label.setPixmap(QPixmap.fromImage(qimage))
+        Interface.display_all_charges_data(self)
+    def limitador(self, position):
+        width, height = self.num_pos
+        x,y = position
+        width= int(width/2) - 1
+        height = int(height/2) - 1
+        print(f'x: {width}, y: {height}')
+        if x <-width or x > width or y < -height or y > height:
+            return True
+        return False
+
+    def verificar_posicao(self, pos):
+        x, y = pos
+        for charge in self.charges:
+            x1, y1 = charge['pos']
+            if x == x1 and y == y1:
+                return True
+        return False
 
     def atualizarName(self):
         for i in range(len(self.charges)):
@@ -567,6 +573,12 @@ class Interface(QMainWindow):
 
         self.layout_menu_esquerdo.setAlignment(Qt.AlignTop)
 
+    def verificar_dados(self, value_charge, position):
+        if value_charge != "" and position != "":
+            pos_tuple = tuple(map(float, position.strip("()").split(",")))
+            if not self.pygame_widget.verificar_posicao(pos_tuple) and not self.pygame_widget.limitador(pos_tuple):
+                self.pygame_widget.addCharge(value_charge, position)
+
     def visualizar_campo_eletrico(self):
         self.pygame_widget.visualizar_campo_eletrico()
     def visualizar_cargas(self):
@@ -590,6 +602,7 @@ class Interface(QMainWindow):
         title_adicionar = QLabel("ARQUIVO")
         title_adicionar.setStyleSheet("font-family: fonte; font-size: 25px; font-weight: bold; border: none; margin-bottom: 20px;")
         self.layout_menu_esquerdo.addWidget(title_adicionar)
+        
 
         # Lista de botões e suas ações
         buttons = [
@@ -621,7 +634,7 @@ class Interface(QMainWindow):
 
         title_adicionar = QLabel("Adicionar")
         title_adicionar.setStyleSheet("font-family: fonte; font-size: 25px; font-weight: bold; border: none; margin-bottom: 20px;")
-
+        
         q_adicionar = QLabel("O valor da carga:")
         q_adicionar.setStyleSheet("font-family: fonte; font-size: 18px; border: none;")
         q_campo_texto = QLineEdit()
@@ -634,9 +647,8 @@ class Interface(QMainWindow):
         pos_texto.setStyleSheet("font-size: 18px; padding: 10px; border: 1px solid gray;")
 
         add_button = QPushButton("Adicionar")
-        add_button.clicked.connect(lambda: self.pygame_widget.addCharge(q_campo_texto.text().strip(), pos_texto.text().strip()))
-        add_button.setStyleSheet("font-family: fonte; font-size: 16px; padding: 10px;  color: black; margin-top: 20px;")
-
+        add_button.clicked.connect(lambda: self.verificar_dados(q_campo_texto.text().strip(), pos_texto.text().strip()))
+        add_button.setStyleSheet("font-family: fonte; font-size: 16px; padding: 10px; color: black; margin-top: 20px;")
         self.layout_menu_esquerdo.addWidget(title_adicionar)
         self.layout_menu_esquerdo.addWidget(q_adicionar)
         self.layout_menu_esquerdo.addWidget(q_campo_texto)
@@ -778,6 +790,55 @@ class Interface(QMainWindow):
         self.layout_menu_esquerdo.addWidget(b_buscar)
         self.layout_menu_esquerdo.addWidget(b_campo_texto)
         self.layout_menu_esquerdo.addWidget(buscar_button)
+
+    def display_all_charges_data(self):
+        if not self.charges:
+            print("Nenhuma carga cadastrada no sistema.")
+            return
+        # Configuração de fonte e cores
+        font = pygame.font.SysFont("Arial", 20)  # Fonte para o texto
+        text_color = (255, 255, 255)             # Branco
+        background_color = (0, 0, 0)            # Preto
+        padding = 10                            # Espaçamento entre informações
+        x_pos = 20                              # Posição horizontal inicial
+        y_pos = 20                              # Posição vertical inicial
+
+        # Desenha um fundo na área esquerda (opcional)
+        pygame.draw.rect(self.screen, background_color, (0, 0, 300, self.screen.get_height()))
+
+        for charge in self.charges:
+            # Nome da carga
+            name_text = font.render(f"Nome: {charge['name']}", True, text_color)
+            self.screen.blit(name_text, (x_pos, y_pos))
+            y_pos += name_text.get_height() + padding
+
+            # Valor da carga
+            charge_text = font.render(f"Carga: {charge['charge']} C", True, text_color)
+            self.screen.blit(charge_text, (x_pos, y_pos))
+            y_pos += charge_text.get_height() + padding
+
+            # Posição da carga
+            pos_text = font.render(f"Posição: {charge['pos']}", True, text_color)
+            self.screen.blit(pos_text, (x_pos, y_pos))
+            y_pos += pos_text.get_height() + padding
+
+            # Vetor de força (se disponível)
+            force = self.show_forces(charge)
+            force_text = font.render(
+                f"F: ({force['total_force'][0]:.2e}î, {force['total_force'][1]:.2e}ĵ) N", 
+                True, 
+                text_color
+            )
+            self.screen.blit(force_text, (x_pos, y_pos))
+            y_pos += force_text.get_height() + padding
+
+            # Magnitude da força
+            magnitude_text = font.render(f"Mag: {force['magnitude_total']:.2e} N", True, text_color)
+            self.screen.blit(magnitude_text, (x_pos, y_pos))
+            y_pos += magnitude_text.get_height() + padding
+
+            # Espaço extra entre cargas
+            y_pos += padding * 2
 
     def display_charge_data(self, charge_number):
             charge = self.pygame_widget.buscarCharge(charge_number)
