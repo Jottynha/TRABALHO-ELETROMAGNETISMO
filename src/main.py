@@ -24,14 +24,17 @@ class PygameWidget(QWidget):
         except Exception as e:
             print(f"Erro ao visualizar o campo elétrico: {e}")
     def visualizar_dados_cargas(self):  
-        Interface.display_all_charges_data(self)
+        if self.info_cargas == False:
+            self.info_cargas = True
+        else:
+            self.info_cargas = False
 
             
     def __init__(self, largura_janela, altura_janela, parent=None):
         super().__init__(parent)
         self.width = largura_janela
         self.height = altura_janela
-
+        self.info_cargas = False
         # Inicializa Pygame
         pygame.init()
         self.screen = None  # Será configurado dinamicamente
@@ -76,6 +79,71 @@ class PygameWidget(QWidget):
         for y in range(mid_y % spacing, height, spacing):  # Linhas horizontais
             pygame.draw.line(self.screen, (200, 200, 200), (0, y), (width, y))
             self.num_pos[1] += 1
+        if self.info_cargas:
+            font = pygame.font.SysFont("Arial", 10)  # Fonte para o texto
+            text_color = (0, 0, 0)  # Cor do texto (preto)
+            background_color = (169, 169, 169)  # Cor cinza para o fundo
+            padding = 10  # Espaçamento entre informações
+            x_pos = 20  # Posição horizontal inicial
+            y_pos = 20  # Posição vertical inicial
+            line_width = 200  # Largura do fundo (ajuste conforme necessário)
+            x_offset = 10  # Distância de deslocamento quando o texto ultrapassar a largura
+
+            # Criar uma superfície para o fundo
+            background_surface = pygame.Surface((line_width, 300))  # Tamanho do fundo (ajuste conforme necessário)
+            background_surface.set_alpha(128)  # Opacidade de 0 a 255 (128 é meio opaco)
+            background_surface.fill(background_color)  # Preenche a superfície com a cor de fundo
+
+            # Desenha o fundo na tela
+            self.screen.fill((255, 255, 255))  # Limpa a tela com cor branca
+            current_x = x_pos
+            current_y = y_pos
+
+            for charge in self.charges:
+                # Se o texto ultrapassar a largura da tela, move para a próxima linha
+                if current_x + line_width > self.screen.get_width():
+                    current_x = x_pos  # Volta para a posição inicial
+                    current_y += 200  # Desce uma linha (ajuste conforme necessário)
+
+                # Criar e renderizar o texto
+                name_text = font.render(f"Nome: {charge['name']}", True, text_color)
+                self.screen.blit(background_surface, (current_x - 10, current_y - 10))  # Fundo para o nome
+                self.screen.blit(name_text, (current_x, current_y))  # Nome
+                current_y += name_text.get_height() + padding
+
+                # Valor da carga
+                charge_text = font.render(f"Carga: {charge['charge']} C", True, text_color)
+                self.screen.blit(background_surface, (current_x - 10, current_y - 10))  # Fundo para a carga
+                self.screen.blit(charge_text, (current_x, current_y))  # Carga
+                current_y += charge_text.get_height() + padding
+
+                # Posição da carga
+                pos_text = font.render(f"Posição: {charge['pos']}", True, text_color)
+                self.screen.blit(background_surface, (current_x - 10, current_y - 10))  # Fundo para a posição
+                self.screen.blit(pos_text, (current_x, current_y))  # Posição
+                current_y += pos_text.get_height() + padding
+
+                # Vetor de força (se disponível)
+                force = self.show_forces(charge)  # Exemplo de como obter força
+                force_text = font.render(f"F: ({force['total_force'][0]:.2e}î, {force['total_force'][1]:.2e}ĵ) N", True, text_color)
+                self.screen.blit(background_surface, (current_x - 10, current_y - 10))  # Fundo para a força
+                self.screen.blit(force_text, (current_x, current_y))  # Força
+                current_y += force_text.get_height() + padding
+
+                # Magnitude da força
+                magnitude_text = font.render(f"Mag: {force['magnitude_total']:.2e} N", True, text_color)
+                self.screen.blit(background_surface, (current_x - 10, current_y - 10))  # Fundo para a magnitude
+                self.screen.blit(magnitude_text, (current_x, current_y))  # Magnitude
+                current_y += magnitude_text.get_height() + padding
+
+                # Espaço extra entre cargas
+                current_y += padding * 2  # Adiciona espaçamento extra para separar as cargas
+
+                # Se o texto ultrapassar a altura da janela, desce mais à direita
+                if current_y > self.screen.get_height() - 50:
+                    current_x += line_width + x_offset  # Move para a próxima "coluna"
+                    current_y = y_pos  # Reseta a posição vertical
+
 
         pygame.draw.line(self.screen, (0, 0, 0), (0, mid_y), (width, mid_y), 2)  # Eixo X
         pygame.draw.line(self.screen, (0, 0, 0), (mid_x, 0), (mid_x, height), 2)  # Eixo Y
@@ -118,7 +186,6 @@ class PygameWidget(QWidget):
         image_data = pygame.image.tostring(self.screen, "RGB")
         qimage = QImage(image_data, width, height, QImage.Format_RGB888)
         self.label.setPixmap(QPixmap.fromImage(qimage))
-        Interface.display_all_charges_data(self)
     def limitador(self, position):
         width, height = self.num_pos
         x,y = position
@@ -312,7 +379,7 @@ class PygameWidget(QWidget):
             arrow_angle = math.pi / 6
             pygame.draw.line(self.screen, color, (end_x, end_y), (end_x - arrow_length * math.cos(angle - arrow_angle), end_y - arrow_length * math.sin(angle - arrow_angle)), 3)
             pygame.draw.line(self.screen, color, (end_x, end_y), (end_x - arrow_length * math.cos(angle + arrow_angle), end_y - arrow_length * math.sin(angle + arrow_angle)), 3)
-
+            
         for i in range(len(charges)):
             total_force_x = 0
             total_force_y = 0
@@ -790,55 +857,6 @@ class Interface(QMainWindow):
         self.layout_menu_esquerdo.addWidget(b_buscar)
         self.layout_menu_esquerdo.addWidget(b_campo_texto)
         self.layout_menu_esquerdo.addWidget(buscar_button)
-
-    def display_all_charges_data(self):
-        if not self.charges:
-            print("Nenhuma carga cadastrada no sistema.")
-            return
-        # Configuração de fonte e cores
-        font = pygame.font.SysFont("Arial", 20)  # Fonte para o texto
-        text_color = (255, 255, 255)             # Branco
-        background_color = (0, 0, 0)            # Preto
-        padding = 10                            # Espaçamento entre informações
-        x_pos = 20                              # Posição horizontal inicial
-        y_pos = 20                              # Posição vertical inicial
-
-        # Desenha um fundo na área esquerda (opcional)
-        pygame.draw.rect(self.screen, background_color, (0, 0, 300, self.screen.get_height()))
-
-        for charge in self.charges:
-            # Nome da carga
-            name_text = font.render(f"Nome: {charge['name']}", True, text_color)
-            self.screen.blit(name_text, (x_pos, y_pos))
-            y_pos += name_text.get_height() + padding
-
-            # Valor da carga
-            charge_text = font.render(f"Carga: {charge['charge']} C", True, text_color)
-            self.screen.blit(charge_text, (x_pos, y_pos))
-            y_pos += charge_text.get_height() + padding
-
-            # Posição da carga
-            pos_text = font.render(f"Posição: {charge['pos']}", True, text_color)
-            self.screen.blit(pos_text, (x_pos, y_pos))
-            y_pos += pos_text.get_height() + padding
-
-            # Vetor de força (se disponível)
-            force = self.show_forces(charge)
-            force_text = font.render(
-                f"F: ({force['total_force'][0]:.2e}î, {force['total_force'][1]:.2e}ĵ) N", 
-                True, 
-                text_color
-            )
-            self.screen.blit(force_text, (x_pos, y_pos))
-            y_pos += force_text.get_height() + padding
-
-            # Magnitude da força
-            magnitude_text = font.render(f"Mag: {force['magnitude_total']:.2e} N", True, text_color)
-            self.screen.blit(magnitude_text, (x_pos, y_pos))
-            y_pos += magnitude_text.get_height() + padding
-
-            # Espaço extra entre cargas
-            y_pos += padding * 2
 
     def display_charge_data(self, charge_number):
             charge = self.pygame_widget.buscarCharge(charge_number)
