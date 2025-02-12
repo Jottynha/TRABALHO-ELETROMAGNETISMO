@@ -317,7 +317,7 @@ class PygameWidget(QWidget):
 
                         
 
-    def salvar_campo(self, name_arquivo="cargas.txt"):
+    def salvar_campo(self, name_arquivo="charges.json"):
         try:
             # Converter as cargas para o formato correto
             charges_to_save = [
@@ -336,6 +336,7 @@ class PygameWidget(QWidget):
             print("Cargas salvas com sucesso no arquivo JSON!")
         except Exception as e:
             print(f"Erro ao salvar o arquivo JSON: {e}")
+
     def salvar(self):
         try:
             with open(name_arquivo, 'w') as file:
@@ -345,24 +346,27 @@ class PygameWidget(QWidget):
         except Exception as e:
             print(f"Erro ao salvar o arquivo: {e}")
 
-    def calculate_force(self,q1, q2):
-        k = 8.99e9  # Constante eletrostática
+    def calculate_force(self, q1, q2):
+        k = 8.99e9  # Constante eletrostática (N·m²/C²)
         dx = q2['pos'][0] - q1['pos'][0]
         dy = q2['pos'][1] - q1['pos'][1]
         distance = math.sqrt(dx**2 + dy**2)
-
-        if distance < 10:  # Evitar que as partículas colidam completamente
-            distance = 10
-
-        force_magnitude = k * abs(q1['charge'] * q2['charge']) / distance**2
-        angle = math.atan2(dy, dx)
-
+        min_distance = 1.0e-10  # Distância mínima para evitar infinito
+        if distance < min_distance:
+            distance = min_distance  
+        force_magnitude = k * abs(q1['charge'] * q2['charge']) / distance**2    
+        angle = math.atan2(abs(dy),abs(dx))
         force_x = math.cos(angle) * force_magnitude
         force_y = math.sin(angle) * force_magnitude
+        sign_x = math.copysign(1,dx)
+        sign_y = math.copysign(1,dy)
         if q1['charge'] * q2['charge'] > 0:
-            return [-force_x, -force_y]  # Repulsão
+            return [sign_x*force_x, sign_y*force_y]  # Repulsão
+        if q1['charge'] * q2['charge'] > 0:
+            return [force_x, force_y]  # Repulsão
         else:
             return [force_x, force_y]  # Atração
+
 
     def draw_force_vectors(self):
         charges = self.charges
@@ -459,7 +463,7 @@ class Interface(QMainWindow):
         self.layout_app()
 
         self.interface_intro()
-        QTimer.singleShot(1000, self.atualizar_interface)  # 1000 milissegundos = 1 segundos
+        QTimer.singleShot(1500, self.atualizar_interface)  # 1000 milissegundos = 1 segundos
 
     def layout_app(self):
         self.setWindowTitle("Simulador de Lei de Coulomb.")
@@ -506,38 +510,39 @@ class Interface(QMainWindow):
 
 
     def interface_introduction(self):
-        self.setCentralWidget(None)  # Remove o layout atual
+        # Remover qualquer widget central anterior
+        self.setCentralWidget(QWidget())
 
-        layout_principal = QVBoxLayout()
+        # Criar o widget central
+        central_widget = QWidget(self)
 
-        # Widgets principais
-        # Widgets principais
-        widget_superior = QWidget()
-        widget_inferior = QWidget()
-
-        # Widgets para divisão inferior
-        widget_inferior_esquerdo = QWidget()
-        widget_inferior_direito = QWidget()
-        #texto_introduction = QLabel("A Lei de Coulomb é uma lei da física que descreve a interação eletrostática")
-        # Texto de introdução
-        #texto_introducao = QLabel("A Lei de Coulomb é uma lei da física que descreve a interação eletrost")
-        title_open = QLabel("Lei de Coulomb")
-        #title_open.setAlignment(Qt.AlignCenter)  # Centraliza o texto
-        title_open.setStyleSheet("font-family: fonte; font-size: 25px; font-weight: bold;")
-        layout_principal.addWidget(title_open, alignment=Qt.AlignLeft)
-
-
-        # Botão "Pular"
-        button_pular = QPushButton("Pular")
-        button_pular.clicked.connect(self.interface_play)  
-        button_pular.setFixedSize(100, 50)
-        button_pular.setStyleSheet("font-family: fonte; font-size: 25px; color: black; border: none;")
-        layout_principal.addWidget(button_pular, alignment=Qt.AlignRight)
-
-        container_open = QWidget()
-        container_open.setLayout(layout_principal)
-        self.setCentralWidget(container_open)
+        # Adicionar a imagem de fundo
+        background_label = QLabel(central_widget)
+        background_pixmap = QPixmap("img/Coulombs_teoria.png")  # Caminho da imagem
+        background_pixmap = background_pixmap.scaled(1920, 1080, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        background_label.setPixmap(background_pixmap)
+        background_label.setScaledContents(True)
         
+        # Ajustar o tamanho da imagem para preencher o widget central
+        background_label.setGeometry(0, 0, central_widget.width(), central_widget.height())
+        central_widget.resizeEvent = lambda event: background_label.setGeometry(0, 0, central_widget.width(), central_widget.height())
+
+        # Criar o botão "Pular"
+        button_pular = QPushButton("Pular", central_widget)
+        button_pular.setFixedSize(100, 50)
+        button_pular.setStyleSheet("""
+        font-family: Arial; 
+        font-size: 20px; 
+        color: black; 
+        border: 1px solid black; 
+        border-radius: 4px;
+        background-color: white;
+        """)
+        button_pular.clicked.connect(self.interface_play)  # Ação do botão
+        button_pular.move(self.size().width() - 120, 20)  # Posiciona o botão no canto superior direito
+
+        # Definir o widget central
+        self.setCentralWidget(central_widget)
 
     def interface_play(self):
         self.setCentralWidget(None)  
@@ -647,7 +652,9 @@ class Interface(QMainWindow):
                 self.pygame_widget.addCharge(value_charge, position)
 
     def visualizar_campo_eletrico(self):
+        self.pygame_widget.salvar_campo()
         self.pygame_widget.visualizar_campo_eletrico()
+
     def visualizar_cargas(self):
         self.pygame_widget.visualizar_dados_cargas()
     def vazio(self):
@@ -658,6 +665,7 @@ class Interface(QMainWindow):
     
     def salvar_arquivo(self):
         self.pygame_widget.salvar()
+
     def F_resultante_ou_separada(self):
         self.pygame_widget.toggle_force_mode()
 
